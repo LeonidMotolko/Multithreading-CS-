@@ -1,43 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Xml;
+﻿using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Serialization;
-
-namespace TablesLibrary
-{
-    public class Tablet
-    {
-        private int ID { get; set; }
-        public string Model { get; set; }
-        public string SerialNumber { get; set; }
-        public string OSType { get; set; }
-    }
-}
-
-namespace TabletLibrary
-{
-    public class Manufacturer
-    {
-        public string Name { get; set; }
-        public string Address { get; set; }
-        private bool IsAChildCompany { get; set; }
-    }
-}
+using TablesLibrary;
 
 class Program
 {
-    static string tabletsXmlFile = "tablets.xml";
-    static string manufacturersXmlFile = "manufacturers.xml";
+    static string tabletsFile = "tablets.xml";
+    static string manufacturersFile = "manufacturers.xml";
 
     static void Main()
     {
-        List<TablesLibrary.Tablet> tablets = new List<TablesLibrary.Tablet>();
-        List<TabletLibrary.Manufacturer> manufacturers = new List<TabletLibrary.Manufacturer>();
-
-        while (true)
+        bool exit = false;
+        while (!exit)
         {
             Console.WriteLine("\nMenu:");
             Console.WriteLine("1 - Create and display 10 Tablets");
@@ -47,177 +21,366 @@ class Program
             Console.WriteLine("5 - Serialize Manufacturers to XML");
             Console.WriteLine("6 - Display Manufacturers from XML file");
             Console.WriteLine("7 - Open and display objects from XML");
-            Console.WriteLine("8 - Find all 'Model' attributes with XDocument");
-            Console.WriteLine("9 - Find all 'Model' attributes with XmlDocument");
+            Console.WriteLine("8 - Find all 'Model' elements with XDocument");
+            Console.WriteLine("9 - Find all 'Model' elements with XmlDocument");
             Console.WriteLine("10 - Modify attribute using XDocument");
             Console.WriteLine("11 - Modify attribute using XmlDocument");
             Console.WriteLine("0 - Exit");
             Console.Write("Choose option: ");
+            string option = Console.ReadLine();
 
-            string choice = Console.ReadLine();
-
-            try
+            switch (option)
             {
-                switch (choice)
-                {
-                    case "1": tablets = CreateTablets(10); PrintTablets(tablets); break;
-                    case "2": SerializeToXml(tablets, tabletsXmlFile); break;
-                    case "3": PrintTablets(DeserializeFromXml<List<TablesLibrary.Tablet>>(tabletsXmlFile)); break;
-                    case "4": manufacturers = CreateManufacturers(10); PrintManufacturers(manufacturers); break;
-                    case "5": SerializeToXml(manufacturers, manufacturersXmlFile); break;
-                    case "6": PrintManufacturers(DeserializeFromXml<List<TabletLibrary.Manufacturer>>(manufacturersXmlFile)); break;
-                    case "7":
-                        Console.Write("Enter XML filename: ");
-                        string fname = Console.ReadLine();
-                        if (fname == tabletsXmlFile) PrintTablets(DeserializeFromXml<List<TablesLibrary.Tablet>>(fname));
-                        else if (fname == manufacturersXmlFile) PrintManufacturers(DeserializeFromXml<List<TabletLibrary.Manufacturer>>(fname));
-                        else Console.WriteLine("Unknown file.");
-                        break;
-                    case "8":
-                        Console.Write("Enter XML filename: ");
-                        UsingXDocumentFindModelAttributes(Console.ReadLine());
-                        break;
-                    case "9":
-                        Console.Write("Enter XML filename: ");
-                        UsingXmlDocumentFindModelAttributes(Console.ReadLine());
-                        break;
-                    case "10": ModifyAttributeXDocument(); break;
-                    case "11": ModifyAttributeXmlDocument(); break;
-                    case "0": return;
-                    default: Console.WriteLine("Invalid option."); break;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
+                case "1":
+                    var tablets = CreateTablets(10);
+                    DisplayPrintable("Tablets:", tablets);
+                    break;
+                case "2":
+                    var tabletsToSerialize = CreateTablets(10);
+                    SerializeToXml(tabletsToSerialize, tabletsFile);
+                    Console.WriteLine($"Tablets serialized to {tabletsFile}");
+                    break;
+                case "3":
+                    DisplayFromFile(tabletsFile);
+                    break;
+                case "4":
+                    var manufacturers = CreateManufacturers(10);
+                    DisplayPrintable("Manufactures:", manufacturers);
+                    break;
+                case "5":
+                    var manufacturersToSerialize = CreateManufacturers(10);
+                    SerializeToXml(manufacturersToSerialize, manufacturersFile);
+                    Console.WriteLine($"Manufacturers serialized to {manufacturersFile}");
+                    break;
+                case "6":
+                    DisplayFromFile(manufacturersFile);
+                    break;
+                case "7":
+                    DisplayObjectsFromXml();
+                    break;
+                case "8":
+                    FindModelValuesXDocument();
+                    break;
+                case "9":
+                    FindModelValuesXmlDocument();
+                    break;
+                case "10":
+                    ModifyXmlAttributeXDocumentMenu();
+                    break;
+                case "11":
+                    ModifyXmlAttributeXmlDocumentMenu();
+                    break;
+                case "0":
+                    exit = true;
+                    break;
+                default:
+                    Console.WriteLine("Invalid option");
+                    break;
             }
         }
     }
 
-    static List<TablesLibrary.Tablet> CreateTablets(int count)
+    #region Create and Display
+
+    //1
+    static List<Tablet> CreateTablets(int count)
     {
-        var list = new List<TablesLibrary.Tablet>();
+        var list = new List<Tablet>();
         for (int i = 1; i <= count; i++)
         {
-            list.Add(new TablesLibrary.Tablet
-            {
-                Model = $"Model{i}",
-                SerialNumber = $"SN{i:000}",
-                OSType = (i % 2 == 0) ? "Android" : "iOS"
-            });
+            list.Add(Tablet.Create(i, $"Model{i}", $"SN{i}", i % 2 == 0 ? "Android" : "iOS"));
         }
         return list;
     }
 
-    static void PrintTablets(List<TablesLibrary.Tablet> tablets)
-    {
-        Console.WriteLine("\nTablets:");
-        foreach (var t in tablets)
-            Console.WriteLine($"Model: {t.Model}, SN: {t.SerialNumber}, OS: {t.OSType}");
-    }
 
-    static List<TabletLibrary.Manufacturer> CreateManufacturers(int count)
+    static void DisplayFromFile(string filePath)
     {
-        var list = new List<TabletLibrary.Manufacturer>();
+        if (File.Exists(filePath))
+        {
+            string content = File.ReadAllText(filePath);
+            Console.WriteLine("File content: ");
+            Console.WriteLine(content);
+        }
+        else
+        {
+            Console.WriteLine("File not found: " + filePath);
+        }
+    }
+    
+    // 
+    static void DisplayPrintable(string header, IEnumerable<IPrintable> printables)
+    {
+        Console.WriteLine("\n" + header);
+        foreach (var printable in printables)
+        {
+            printable.Print();
+        }   
+    }
+    
+
+    //4
+    static List<Manufacturer> CreateManufacturers(int count)
+    {
+        var list = new List<Manufacturer>();
         for (int i = 1; i <= count; i++)
         {
-            list.Add(new TabletLibrary.Manufacturer
-            {
-                Name = $"Company{i}",
-                Address = $"Street {i}"
-            });
+            list.Add(Manufacturer.Create($"Name{i}", $"Address{i}", i % 2 == 0));
         }
         return list;
     }
 
-    static void PrintManufacturers(List<TabletLibrary.Manufacturer> list)
+    #endregion
+
+    #region Serialization and Deserialization
+
+    //5
+    static void SerializeToXml<T>(T obj, string filename)
     {
-        Console.WriteLine("\nManufacturers:");
-        foreach (var m in list)
-            Console.WriteLine($"Name: {m.Name}, Address: {m.Address}");
-    }
-
-    static void SerializeToXml<T>(T obj, string path)
-    {
-        XmlSerializer ser = new XmlSerializer(typeof(T));
-        using (FileStream fs = new FileStream(path, FileMode.Create))
-            ser.Serialize(fs, obj);
-    }
-
-    static T DeserializeFromXml<T>(string path)
-    {
-        XmlSerializer ser = new XmlSerializer(typeof(T));
-        using (FileStream fs = new FileStream(path, FileMode.Open))
-            return (T)ser.Deserialize(fs);
-    }
-
-    static void UsingXDocumentFindModelAttributes(string filename)
-    {
-        XDocument doc = XDocument.Load(filename);
-        var models = doc.Descendants().Attributes("Model");
-        foreach (var m in models)
-            Console.WriteLine(m.Value);
-    }
-
-    static void UsingXmlDocumentFindModelAttributes(string filename)
-    {
-        XmlDocument doc = new XmlDocument();
-        doc.Load(filename);
-        XmlNodeList nodes = doc.SelectNodes("//*[@Model]");
-        foreach (XmlNode node in nodes)
-            Console.WriteLine(node.Attributes["Model"].Value);
-    }
-
-    static void ModifyAttributeXDocument()
-    {
-        Console.Write("Enter XML filename: ");
-        string file = Console.ReadLine();
-        if (!File.Exists(file)) { Console.WriteLine("File not found."); return; }
-
-        Console.Write("Enter element index (0-based): ");
-        int idx = int.Parse(Console.ReadLine());
-
-        Console.Write("Enter attribute name: ");
-        string attr = Console.ReadLine();
-
-        Console.Write("Enter new value: ");
-        string value = Console.ReadLine();
-
-        XDocument doc = XDocument.Load(file);
-        var elements = doc.Descendants().Where(e => e.Attribute(attr) != null).ToList();
-        if (idx >= 0 && idx < elements.Count)
+        try
         {
-            elements[idx].Attribute(attr).Value = value;
-            doc.Save(file);
-            Console.WriteLine("Attribute updated successfully.");
+            if (!File.Exists(filename))
+            {
+                Console.WriteLine($"File {filename} not found");
+                return ;
+            }
+            
+            XmlSerializer serializer = new XmlSerializer(typeof(T));
+            using (var writer = new StreamWriter(filename))
+            {
+                serializer.Serialize(writer, obj);
+            }
         }
-        else Console.WriteLine("Index out of range.");
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Serialization error: {ex.Message}");
+        }
     }
 
-    static void ModifyAttributeXmlDocument()
+    //
+    static T DeserializeFromXml<T>(string filename) where T : class
     {
-        Console.Write("Enter XML filename: ");
-        string file = Console.ReadLine();
-        if (!File.Exists(file)) { Console.WriteLine("File not found."); return; }
-
-        Console.Write("Enter element index (0-based): ");
-        int idx = int.Parse(Console.ReadLine());
-
-        Console.Write("Enter attribute name: ");
-        string attr = Console.ReadLine();
-
-        Console.Write("Enter new value: ");
-        string value = Console.ReadLine();
-
-        XmlDocument doc = new XmlDocument();
-        doc.Load(file);
-        XmlNodeList nodes = doc.SelectNodes($"//*[@{attr}]");
-        if (idx >= 0 && idx < nodes.Count)
+        try
         {
-            nodes[idx].Attributes[attr].Value = value;
-            doc.Save(file);
-            Console.WriteLine("Attribute updated successfully.");
+            XmlSerializer serializer = new XmlSerializer(typeof(T));
+            using (var reader = new StreamReader(filename))
+            {
+                return serializer.Deserialize(reader) as T;
+            }
         }
-        else Console.WriteLine("Index out of range.");
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Deserialization error: {ex.Message}");
+            return null;
+        }
+    }
+
+    #endregion
+
+    #region XML Reading and Searching
+
+    static void DisplayObjectsFromXml()
+    {
+        string filename = InputFilename("Enter XML filename: ");
+        string name = Path.GetFileName(filename).ToLower();
+    
+        switch (name)
+        {
+            case "manufacturers.xml":
+                var manufactures = DeserializeFromXml<List<Manufacturer>>(filename);
+                DisplayPrintable("Manufactures:", manufactures);
+                break;
+    
+            case "tablets.xml":
+                var tablets = DeserializeFromXml<List<Tablet>>(filename);
+                DisplayPrintable("Tablets:", tablets);
+                break;
+    
+            default:
+                Console.WriteLine($"Unsupported XML file: {name}");
+                break;
+        }
+    }
+
+
+    // Find all <Model> elements and print their values using XDocument
+    static void FindModelValuesXDocument()
+    {
+        try
+        {
+            string filename = InputFilename("Enter XML filename: ");
+            
+            XDocument xdoc = XDocument.Load(filename);
+            var models = xdoc.Descendants().Attributes("Model").Select(x => x.Value).Distinct();
+
+            Console.WriteLine("Model values found with XDocument:");
+            foreach (var model in models)
+            {
+                Console.WriteLine(model);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error reading file: {ex.Message}");
+        }
+    }
+
+    // Find all <Model> elements and print their values using XmlDocument
+    static void FindModelValuesXmlDocument()
+    {
+        try
+        {
+            string filename = InputFilename("Enter XML filename: ");
+
+            XmlDocument xmlDoc = new XmlDocument();
+            xmlDoc.Load(filename);
+
+            
+            var nodes = xmlDoc.SelectNodes("//*[@Model]");
+            
+
+            Console.WriteLine("Model values found with XmlDocument:");
+            foreach (XmlNode node in nodes)
+            {
+                Console.WriteLine(((XmlElement)node).GetAttribute("Model"));
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error reading file: {ex.Message}");
+        }
+    }
+
+    #endregion
+
+    #region Modify XML Attribute
+
+
+    
+    // Menu and logic for modifying XML using XDocument
+    static void ModifyXmlAttributeXDocumentMenu()
+    {
+        string filename = InputFilename();
+
+        Console.Write("Enter attribute name to modify: ");
+        string attrName = Console.ReadLine();
+
+        Console.Write("Enter element number (1-based): ");
+        if (!int.TryParse(Console.ReadLine(), out int elementNumber) || elementNumber < 1)
+        {
+            Console.WriteLine("Invalid element number");
+            return;
+        }
+
+        Console.Write("Enter new attribute value: ");
+        string newValue = Console.ReadLine();
+
+        ModifyAttributeUsingXDocument(filename, attrName, elementNumber, newValue);
+    }
+
+    // Modify attribute value using XDocument without rewriting whole file (modifies in memory, then saves)
+    static void ModifyAttributeUsingXDocument(string filename, string attributeName, int elementIndex, string newValue)
+    {
+        try
+        {
+            
+            XDocument xdoc = XDocument.Load(filename);
+            // Get all elements that have the attribute
+            var elementsWithAttr = xdoc.Descendants()
+                .Where(e => e.Attribute(attributeName) != null)
+                .ToList();
+
+            if (elementsWithAttr.Count == 0)
+            {
+                Console.WriteLine($"No elements with attribute '{attributeName}' found");
+                return;
+            }
+
+            if (elementIndex > elementsWithAttr.Count)
+            {
+                Console.WriteLine($"Element number {elementIndex} exceeds number of elements with '{attributeName}' attribute ({elementsWithAttr.Count})");
+                return;
+            }
+
+            // Modify the attribute value
+            elementsWithAttr[elementIndex - 1].SetAttributeValue(attributeName, newValue);
+            xdoc.Save(filename);
+            Console.WriteLine($"Attribute '{attributeName}' updated for element #{elementIndex}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error modifying XML: {ex.Message}");
+        }
+    }
+
+    // Menu and logic for modifying XML using XmlDocument
+    static void ModifyXmlAttributeXmlDocumentMenu()
+    {
+        string filename = InputFilename();
+
+        Console.Write("Enter attribute name to modify: ");
+        string attrName = Console.ReadLine();
+
+        Console.Write("Enter element number (1-based): ");
+        if (!int.TryParse(Console.ReadLine(), out int elementNumber) || elementNumber < 1)
+        {
+            Console.WriteLine("Invalid element number");
+            return;
+        }
+
+        Console.Write("Enter new attribute value: ");
+        string newValue = Console.ReadLine();
+
+        ModifyAttributeUsingXmlDocument(filename, attrName, elementNumber, newValue);
+    }
+
+    // Modify attribute value using XmlDocument
+    static void ModifyAttributeUsingXmlDocument(string filename, string attributeName, int elementIndex, string newValue)
+    {
+        try
+        {
+            XmlDocument xmlDoc = new XmlDocument();
+            xmlDoc.Load(filename);
+
+            // Select all elements that have the attribute
+            XmlNodeList nodesWithAttr = xmlDoc.SelectNodes($"//*[@{attributeName}]");
+
+            if (nodesWithAttr == null || nodesWithAttr.Count == 0)
+            {
+                Console.WriteLine($"No elements with attribute '{attributeName}' found");
+                return;
+            }
+
+            if (elementIndex > nodesWithAttr.Count)
+            {
+                Console.WriteLine($"Element number {elementIndex} exceeds number of elements with '{attributeName}' attribute ({nodesWithAttr.Count})");
+                return;
+            }
+
+            XmlElement element = (XmlElement)nodesWithAttr[elementIndex - 1];
+            element.SetAttribute(attributeName, newValue);
+
+            xmlDoc.Save(filename);
+            Console.WriteLine($"Attribute '{attributeName}' updated for element #{elementIndex}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error modifying XML: {ex.Message}");
+        }
+    }
+
+    #endregion
+    
+    static string InputFilename(string message="Enter XML filename: ")
+    {
+        Console.Write(message);
+        string filename = Console.ReadLine();
+        if (!File.Exists(filename))
+        {
+            Console.WriteLine("File not found");
+            return InputFilename();
+        }
+
+        return filename;
     }
 }
